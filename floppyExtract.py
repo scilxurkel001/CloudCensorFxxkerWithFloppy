@@ -20,7 +20,7 @@ def compute_sha256(file_path):
 class FloppyExtractorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("CloudCensorFxxkerWithFloppy - Extractor")
+        self.root.title("CloudCensorFxxkerWithFloppy - Extractor - v1.10a")
         self.root.geometry("620x400")
         
         self.source_dir = tk.StringVar()
