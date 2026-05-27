@@ -144,7 +144,7 @@ class FloppyCompressorApp:
                         break
                     disk_num += 1
 
-                    img_name = f"flp{disk_num:03d}.img"
+                    img_name = f"FLP{disk_num:05d}.IMG"
                     img_path = os.path.join(out, img_name)
 
                     self.root.after(0, lambda d=disk_num, t=total_disks: self.lbl_status.config(
@@ -154,7 +154,7 @@ class FloppyCompressorApp:
 
                     try:
                         fat = PyFatFS(img_path)
-                        fat_filename = f"{disk_num:08d}.DAT"
+                        fat_filename = f"FLP{disk_num:05d}.DAT"
                         
                         with fat.openbin(f"/{fat_filename}", 'wb') as dst_f:
                             dst_f.write(chunk)
@@ -164,7 +164,7 @@ class FloppyCompressorApp:
 
                     self.root.after(0, lambda v=disk_num: self.progress.config(value=v))
 
-            # 清理临时文件
+            # Clear Temporary Files
             if os.path.exists(temp_zip):
                 os.remove(temp_zip)
 
