@@ -62,7 +62,7 @@ def create_blank_fat12_image(path):
 class FloppyCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.10b")
+        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.20a")
         self.root.geometry("620x400")
         self.source_path = tk.StringVar()
         self.output_dir = tk.StringVar()
