@@ -11,7 +11,7 @@ import json
 
 # 🔴 Optimized Geometry Configurations Matrix with Human-Readable Display Names
 FLOPPY_CONFIGS = {
-    "720KB (Standard Double Density Floppy)": {
+    "720KB (Standard Double Density Floppy) for <= 2GB data": {
         "key": "720KB",
         "chunk_size": 540 * 1024,
         "total_sectors": 1440,
@@ -21,7 +21,7 @@ FLOPPY_CONFIGS = {
         "sectors_per_fat": 3,
         "media_descriptor": 0xF9
     },
-    "1.44MB (Standard High Density Floppy)": {
+    "1440KB (Standard High Density Floppy) for 2-4GB data": {
         "key": "1440KB",
         "chunk_size": 1320 * 1024,
         "total_sectors": 2880,
@@ -31,7 +31,7 @@ FLOPPY_CONFIGS = {
         "sectors_per_fat": 9,
         "media_descriptor": 0xF0
     },
-    "2.88MB (Extreme Density Floppy)": {
+    "2880KB (Extreme Density Floppy) for 4-8GB data": {
         "key": "2880KB",
         "chunk_size": 2760 * 1024,
         "total_sectors": 5760,
@@ -41,7 +41,7 @@ FLOPPY_CONFIGS = {
         "sectors_per_fat": 9,
         "media_descriptor": 0xF0
     },
-    "5.76MB (RARE Triple Density Floppy)": {
+    "5760KB (RARE Triple Density Floppy) for 8-16GB data": {
         "key": "5760KB",
         "chunk_size": 5640 * 1024,
         "total_sectors": 11520,
@@ -50,7 +50,27 @@ FLOPPY_CONFIGS = {
         "root_dir_entries": 240,
         "sectors_per_fat": 18,
         "media_descriptor": 0xF0
-    }
+    },
+    "11520KB (Quad Density Floppy) - Not Recommended": {
+        "key": "11520KB",
+        "chunk_size": 10960 * 1024,
+        "total_sectors": 23040,
+        "sectors_per_track": 144,
+        "sectors_per_cluster": 8,
+        "root_dir_entries": 240,
+        "sectors_per_fat": 18,
+        "media_descriptor": 0xF0
+    },
+    "23040KB (idk Density Floppy) - Not Recommended": {
+        "key": "23040KB",
+        "chunk_size": 22640 * 1024,
+        "total_sectors": 46080,
+        "sectors_per_track": 288,
+        "sectors_per_cluster": 16,
+        "root_dir_entries": 240,
+        "sectors_per_fat": 18,
+        "media_descriptor": 0xF0
+    },
 }
 
 def compute_sha256(file_path):
@@ -105,13 +125,13 @@ def create_dynamic_fat12_image(path, cfg):
 class FloppyCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.21a")
+        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.21b")
         self.root.geometry("650x450")
         self.source_path = tk.StringVar()
         self.output_dir = tk.StringVar()
         
         # Default combo selection text
-        self.capacity_display_var = tk.StringVar(value="1.44MB (Standard High Density Floppy)")
+        self.capacity_display_var = tk.StringVar(value="1440KB (Standard High Density Floppy) for 2-4GB data")
         self.create_widgets()
 
     def create_widgets(self):
@@ -125,17 +145,30 @@ class FloppyCompressorApp:
         # 2. Select Floppy Format Size (UI Optimized)
         frame_cfg = ttk.LabelFrame(self.root, text=" 2. Floppy Target Specification ", padding=10)
         frame_cfg.pack(fill="x", padx=15, pady=8)
-        ttk.Label(frame_cfg, text="Select Format Type: ").pack(side="left", padx=5)
+
+        row1 = ttk.Frame(frame_cfg)
+        row1.pack(fill="x", pady=(0, 4))
+        ttk.Label(row1, text="Select Format Type: ").pack(side="left", padx=5)
         self.combo_capacity = ttk.Combobox(
-            frame_cfg,
+            row1,
             textvariable=self.capacity_display_var,
             values=list(FLOPPY_CONFIGS.keys()),
             state="readonly",
-            width=36
+            width=48
         )
         self.combo_capacity.pack(side="left", padx=5)
-        self.lbl_chunk_hint = ttk.Label(frame_cfg, text="Split Chunk Size: 1320 KB", foreground="#0066cc", padding=9)
-        self.lbl_chunk_hint.pack(side="left", padx=5)
+
+        row2 = ttk.Frame(frame_cfg)
+        row2.pack(fill="x")
+
+        self.lbl_chunk_hint = ttk.Label(
+            row2,
+            text="Split Chunk Size: 1320 KB",
+            foreground="#0066cc",
+            padding=9
+        )
+        self.lbl_chunk_hint.pack(side="left", padx=(120, 0))
+
         self.combo_capacity.bind("<<ComboboxSelected>>", self.update_chunk_hint)
 
         # 3. Select Output
