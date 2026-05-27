@@ -9,33 +9,33 @@ import tempfile
 import hashlib
 import json
 
-# Safe chunk size for FAT12 (1.44MB floppy) considering FAT overhead and file system limits
-CHUNK_SIZE = 1400 * 1024  
+# 🔴 Gold standard line for 2.88MB floppy to keep 100% compatibility and enough FS overhead
+CHUNK_SIZE = 2760 * 1024  
 
-# General utility functions
+# General utility functions with optimized 64KB buffer for speed
 def compute_sha256(file_path):
     h = hashlib.sha256()
     with open(file_path, 'rb') as f:
-        for b in iter(lambda: f.read(8192), b''):
+        for b in iter(lambda: f.read(65536), b''):
             h.update(b)
     return h.hexdigest()
 
 def create_blank_fat12_image(path):
-    """Generate a blank FAT12 floppy disk image (1.44MB)"""
+    """Generate a standard BLANK 2.88MB FAT12 floppy disk image (ED Floppy)"""
     with open(path, 'wb') as f:
         # 1. Boot Sector (512 bytes)
         bs = bytearray(512)
         bs[0:3] = b'\xEB\x3C\x90'
         bs[3:11] = b'MSDOS5.0'
         struct.pack_into('<H', bs, 11, 512)  # Bytes per sector
-        bs[13] = 1                           # Sectors per cluster
+        bs[13] = 2                           # 🔴 Standard 2 sectors per cluster (1KB per cluster)
         struct.pack_into('<H', bs, 14, 1)    # Reserved sectors
         bs[16] = 2                           # Number of FATs
-        struct.pack_into('<H', bs, 17, 224)  # Root dir entries
-        struct.pack_into('<H', bs, 19, 2880) # Total sectors
+        struct.pack_into('<H', bs, 17, 240)  # 🔴 Standard 2.88MB root dir entries (240 entries)
+        struct.pack_into('<H', bs, 19, 5760) # 🔴 Standard 2.88MB total sectors (5760 sectors)
         bs[21] = 0xF0                        # Media descriptor
         struct.pack_into('<H', bs, 22, 9)    # Sectors per FAT
-        struct.pack_into('<H', bs, 24, 18)   # Sectors per track
+        struct.pack_into('<H', bs, 24, 36)   # 🔴 Standard 2.88MB sectors per track (36 SPT)
         struct.pack_into('<H', bs, 26, 2)    # Heads
         bs[38] = 0x29                        # Extended boot signature
         struct.pack_into('<I', bs, 39, 0x12345678) # Volume serial
@@ -51,16 +51,18 @@ def create_blank_fat12_image(path):
         f.write(fat)
         f.write(fat)
 
-        # 3. Root Directory (14 sectors = 7168 bytes)
-        f.write(bytearray(7168))
+        # 3. Root Directory (240 entries = 15 sectors = 7680 bytes)
+        # 🔴 2.88MB Root dir requires 15 sectors (7680 bytes)
+        f.write(bytearray(7680))
 
-        # 4. Data Area (2847 sectors = 1,457,664 bytes)
-        f.write(bytearray(1457664))
+        # 4. Data Area (5760 - 1 - 9 - 9 - 15 = 5726 sectors = 2,931,712 bytes)
+        # 🔴 2.88MB Standard Data area size
+        f.write(bytearray(2931712))
 
 class FloppyCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.10a")
+        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.10b")
         self.root.geometry("620x400")
         self.source_path = tk.StringVar()
         self.output_dir = tk.StringVar()
@@ -135,7 +137,6 @@ class FloppyCompressorApp:
                             arcname = os.path.relpath(full_path, base_dir)
                             zf.write(full_path, arcname)
 
-            # Verify SHA-256 of the ZIP file before splitting
             zip_hash = compute_sha256(temp_zip)
             manifest = {
                 "zip_hash": zip_hash,
@@ -145,9 +146,13 @@ class FloppyCompressorApp:
             file_size = os.path.getsize(temp_zip)
             total_disks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE
 
-            self.root.after(0, lambda: self.progress.stop())
-            self.root.after(0, lambda: self.progress.config(mode="determinate", maximum=total_disks, value=0))
-            self.root.after(0, lambda: self.lbl_status.config(text=f"Step 2/2: Splitting and Writing Floppy Images (Total: {total_disks})..."))
+            # 🔴 Thread-safe GUI transformation using after()
+            def switch_to_determinate_mode(total):
+                self.progress.stop()
+                self.progress.config(mode="determinate", maximum=total, value=0)
+                self.lbl_status.config(text=f"Step 2/2: Splitting and Writing 2.88MB Floppy Images (Total: {total})...")
+
+            self.root.after(0, switch_to_determinate_mode, total_disks)
 
             with open(temp_zip, 'rb') as f:
                 disk_num = 0
@@ -157,7 +162,6 @@ class FloppyCompressorApp:
                         break
                     disk_num += 1
                     
-                    # Verify SHA-256 of the chunk before writing
                     chunk_hash = hashlib.sha256(chunk).hexdigest()
 
                     img_name = f"FLP{disk_num:05d}.IMG"
@@ -169,6 +173,7 @@ class FloppyCompressorApp:
                     create_blank_fat12_image(img_path)
 
                     try:
+                        # PyFatFS successfully initializes because BPB geometry is perfectly mapped
                         fat = PyFatFS(img_path)
                         fat_filename = f"FLP{disk_num:05d}.DAT"
                         
@@ -178,7 +183,6 @@ class FloppyCompressorApp:
                     except Exception as e:
                         raise RuntimeError(f"Failed to write to pyfatfs [{img_name}]: {e}") from e
 
-                    # Verify SHA-256 of IMG file
                     image_hash = compute_sha256(img_path)
                     manifest["images"][img_name] = {
                         "chunk_hash": chunk_hash,
@@ -197,7 +201,7 @@ class FloppyCompressorApp:
 
             self.root.after(0, lambda: messagebox.showinfo(
                 "Success", 
-                f"Floppy images and manifest.json generated at:\n{out}\n\n💡 Tip: The Extractor will automatically verify the SHA-256 hashes."
+                f"2.88MB Floppy images and manifest.json generated at:\n{out}\n\n💡 Tip: Splitting count reduced significantly due to 2760KB density!"
             ))
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", f"Processing failed:\n{str(e)}"))
@@ -206,6 +210,7 @@ class FloppyCompressorApp:
             if os.path.exists(temp_zip):
                 try: os.remove(temp_zip)
                 except: pass
+            # 🔴 Thread-safe GUI resets
             self.root.after(0, lambda: self.progress.stop())
             self.root.after(0, lambda: self.btn_start.config(state="normal"))
 
