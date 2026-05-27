@@ -20,7 +20,7 @@ You need:
 
 ### Compilation Method 1 (Highly Recommended)
 
-If you have `uv`, please execute the `uv sync` command directly and proceed to the next step once the installation is complete.
+If you have `uv`, please execute the `uv sync --python 3.8` command directly and proceed to the next step once the installation is complete.
 
 ### Compilation Method 2 (Traditional)
 
