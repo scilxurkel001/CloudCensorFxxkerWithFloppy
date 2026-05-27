@@ -70,12 +70,12 @@ class FloppyExtractorApp:
         src = self.source_dir.get()
         out = self.output_dir.get()
         
-        search_pattern = os.path.join(src, "flp*.img")
+        search_pattern = os.path.join(src, "[Ff][Ll][Pp]*.[Ii][Mm][Gg]")
         img_files = sorted(glob.glob(search_pattern))
         
         total_files = len(img_files)
         if total_files == 0:
-            self.root.after(0, lambda: messagebox.showinfo("Info", "No files matching flp*.img format found!"))
+            self.root.after(0, lambda: messagebox.showinfo("Info", "No files matching FLP*.IMG format found!"))
             self.root.after(0, lambda: self.btn_start.config(state="normal"))
             return
 
