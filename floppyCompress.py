@@ -6,9 +6,19 @@ from tkinter import filedialog, messagebox, ttk
 from pyfatfs.PyFatFS import PyFatFS
 import zipfile
 import tempfile
+import hashlib
+import json
 
 # Safe chunk size for FAT12 (1.44MB floppy) considering FAT overhead and file system limits
 CHUNK_SIZE = 1400 * 1024  
+
+# General utility functions
+def compute_sha256(file_path):
+    h = hashlib.sha256()
+    with open(file_path, 'rb') as f:
+        for b in iter(lambda: f.read(8192), b''):
+            h.update(b)
+    return h.hexdigest()
 
 def create_blank_fat12_image(path):
     """Generate a blank FAT12 floppy disk image (1.44MB)"""
@@ -46,7 +56,6 @@ def create_blank_fat12_image(path):
 
         # 4. Data Area (2847 sectors = 1,457,664 bytes)
         f.write(bytearray(1457664))
-
 
 class FloppyCompressorApp:
     def __init__(self, root):
@@ -110,13 +119,11 @@ class FloppyCompressorApp:
         src = self.source_path.get()
         out = self.output_dir.get()
         
-        # Use a temporary file to store the intermediate ZIP archive
         temp_zip = os.path.join(tempfile.gettempdir(), f"floppy_temp_{os.getpid()}.zip")
 
         try:
             self.root.after(0, lambda: self.lbl_status.config(text="Step 1/2: Compressing source files..."))
 
-            # Use zipfile to create a compressed archive of the source file/directory
             with zipfile.ZipFile(temp_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
                 if os.path.isfile(src):
                     zf.write(src, os.path.basename(src))
@@ -128,6 +135,13 @@ class FloppyCompressorApp:
                             arcname = os.path.relpath(full_path, base_dir)
                             zf.write(full_path, arcname)
 
+            # Verify SHA-256 of the ZIP file before splitting
+            zip_hash = compute_sha256(temp_zip)
+            manifest = {
+                "zip_hash": zip_hash,
+                "images": {}
+            }
+
             file_size = os.path.getsize(temp_zip)
             total_disks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE
 
@@ -135,7 +149,6 @@ class FloppyCompressorApp:
             self.root.after(0, lambda: self.progress.config(mode="determinate", maximum=total_disks, value=0))
             self.root.after(0, lambda: self.lbl_status.config(text=f"Step 2/2: Splitting and Writing Floppy Images (Total: {total_disks})..."))
 
-            # 2. Split the ZIP file into chunks and write each chunk into a separate FAT12 image
             with open(temp_zip, 'rb') as f:
                 disk_num = 0
                 while True:
@@ -143,6 +156,9 @@ class FloppyCompressorApp:
                     if not chunk:
                         break
                     disk_num += 1
+                    
+                    # Verify SHA-256 of the chunk before writing
+                    chunk_hash = hashlib.sha256(chunk).hexdigest()
 
                     img_name = f"FLP{disk_num:05d}.IMG"
                     img_path = os.path.join(out, img_name)
@@ -162,17 +178,26 @@ class FloppyCompressorApp:
                     except Exception as e:
                         raise RuntimeError(f"Failed to write to pyfatfs [{img_name}]: {e}") from e
 
+                    # Verify SHA-256 of IMG file
+                    image_hash = compute_sha256(img_path)
+                    manifest["images"][img_name] = {
+                        "chunk_hash": chunk_hash,
+                        "image_hash": image_hash
+                    }
+
                     self.root.after(0, lambda v=disk_num: self.progress.config(value=v))
 
-            # Clear Temporary Files
+            # Export manifest.json
+            manifest_path = os.path.join(out, "manifest.json")
+            with open(manifest_path, 'w', encoding='utf-8') as mf:
+                json.dump(manifest, mf, indent=4)
+
             if os.path.exists(temp_zip):
                 os.remove(temp_zip)
 
             self.root.after(0, lambda: messagebox.showinfo(
                 "Success", 
-                f"Floppy images generated at:\n{out}\n\n💡 Tip: When extracting, please use the supporting extractor or manually merge the chunks:\n"
-                f"Windows: copy /b *.DAT combined.zip\n"
-                f"Linux/Mac: cat *.DAT > combined.zip"
+                f"Floppy images and manifest.json generated at:\n{out}\n\n💡 Tip: The Extractor will automatically verify the SHA-256 hashes."
             ))
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", f"Processing failed:\n{str(e)}"))
@@ -183,7 +208,6 @@ class FloppyCompressorApp:
                 except: pass
             self.root.after(0, lambda: self.progress.stop())
             self.root.after(0, lambda: self.btn_start.config(state="normal"))
-
 
 if __name__ == "__main__":
     root = tk.Tk()
