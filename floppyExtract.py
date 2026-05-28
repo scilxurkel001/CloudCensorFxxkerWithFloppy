@@ -51,8 +51,8 @@ class FloppyExtractorApp:
         scale = get_scale_factor()
         self.root = root
         self.root.title("CloudCensorFxxkerWithFloppy - Extractor - v1.20b")
-        self.root.geometry("620x400")
-        
+        BASE_W, BASE_H = 650, 450
+        self.root.geometry(f"{int(BASE_W * scale)}x{int(BASE_H * scale)}")
         self.source_dir = tk.StringVar()
         self.output_dir = tk.StringVar()
         
