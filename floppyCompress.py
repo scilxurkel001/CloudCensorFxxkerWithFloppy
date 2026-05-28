@@ -1,3 +1,4 @@
+import logging
 import os
 import struct
 import threading
@@ -8,6 +9,9 @@ import zipfile
 import tempfile
 import hashlib
 import json
+import ctypes
+import sys
+import platform
 
 # 🔴 Optimized Geometry Configurations Matrix with Human-Readable Display Names
 FLOPPY_CONFIGS = {
@@ -122,11 +126,38 @@ def create_dynamic_fat12_image(path, cfg):
         data_area_size = data_sectors * 512
         f.write(bytearray(data_area_size))
 
+def setup_high_dpi():
+    if platform.system() == 'Windows':
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except:
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()
+            except:
+                pass
+
 class FloppyCompressorApp:
     def __init__(self, root):
+        def get_scale_factor():
+            if platform.system() == 'Windows':
+                try:
+                    return ctypes.windll.user32.GetDpiForSystem() / 96.0
+                except:
+                    hdc = ctypes.windll.user32.GetDC(0)
+                    dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)
+                    ctypes.windll.user32.ReleaseDC(0, hdc)
+                    return dpi / 96.0
+            # Linux and macOS typically handle DPI scaling automatically, but we can attempt to read GDK_SCALE for Linux
+            try:
+                # Some Linux environments use GDK_SCALE for scaling factor, default to 1.0 if not set
+                return float(os.environ.get('GDK_SCALE', 1.0))
+            except:
+                return 1.0
+        scale = get_scale_factor()
         self.root = root
-        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.21b")
-        self.root.geometry("650x450")
+        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.21c")
+        BASE_W, BASE_H = 650, 450
+        self.root.geometry(f"{int(BASE_W * scale)}x{int(BASE_H * scale)}")
         self.source_path = tk.StringVar()
         self.output_dir = tk.StringVar()
         
@@ -319,6 +350,7 @@ class FloppyCompressorApp:
             self.root.after(0, lambda: self.combo_capacity.config(state="readonly"))
 
 if __name__ == "__main__":
+    setup_high_dpi()
     root = tk.Tk()
     app = FloppyCompressorApp(root)
     root.mainloop()
