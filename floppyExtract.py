@@ -1,13 +1,17 @@
+import logging
 import os
-import glob
+import struct
 import threading
-import tempfile
-import zipfile
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pyfatfs.PyFatFS import PyFatFS
+import zipfile
+import tempfile
 import hashlib
 import json
+import ctypes
+import sys
+import platform
 
 # Optimized buffer for larger 2.88MB floppy images
 def compute_sha256(file_path):
@@ -17,10 +21,36 @@ def compute_sha256(file_path):
             h.update(b)
     return h.hexdigest()
 
+def setup_high_dpi():
+    if platform.system() == 'Windows':
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except:
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()
+            except:
+                pass
+
 class FloppyExtractorApp:
     def __init__(self, root):
+        def get_scale_factor():
+            if platform.system() == 'Windows':
+                try:
+                    return ctypes.windll.user32.GetDpiForSystem() / 96.0
+                except:
+                    hdc = ctypes.windll.user32.GetDC(0)
+                    dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)
+                    ctypes.windll.user32.ReleaseDC(0, hdc)
+                    return dpi / 96.0
+            # Linux and macOS typically handle DPI scaling automatically, but we can attempt to read GDK_SCALE for Linux
+            try:
+                # Some Linux environments use GDK_SCALE for scaling factor, default to 1.0 if not set
+                return float(os.environ.get('GDK_SCALE', 1.0))
+            except:
+                return 1.0
+        scale = get_scale_factor()
         self.root = root
-        self.root.title("CloudCensorFxxkerWithFloppy - Extractor - v1.20a")
+        self.root.title("CloudCensorFxxkerWithFloppy - Extractor - v1.20b")
         self.root.geometry("620x400")
         
         self.source_dir = tk.StringVar()
@@ -215,6 +245,7 @@ class FloppyExtractorApp:
             self.root.after(0, lambda: self.btn_start.config(state="normal"))
 
 if __name__ == "__main__":
+    setup_high_dpi()
     root = tk.Tk()
     app = FloppyExtractorApp(root)
     root.mainloop()
