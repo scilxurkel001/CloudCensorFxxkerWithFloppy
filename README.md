@@ -44,7 +44,7 @@ Execute `uv run pyinstaller -F --noconsole --name "CCFWF-Compressor" floppyCompr
 
 Or execute the command `.venv\Scripts\activate` (Windows) or `source .venv/bin/activate` (macOS / Linux) to activate the environment, and execute `pyinstaller -F --noconsole --name "CCFWF-Compressor" floppyCompress.py` / `pyinstaller -F --noconsole --name "CCFWF-Extractor" floppyExtract.py`.
 
-If you use the Qt version, you need to execute `uv run pyinstaller -F --noconsole --name "CCFWF-Compressor-Qt" --add-data "fonts;fonts;" floppyCompress-Qt.py` / `uv run pyinstaller -F --noconsole --name "CCFWF-Extractor-Qt" --add-data "fonts;fonts;" floppyExtract-Qt.py`. 
+If you use the Qt version, you need to execute `uv run pyinstaller -F --noconsole --name "CCFWF-Compressor-Qt" --add-data "fonts;fonts" floppyCompress-Qt.py` / `uv run pyinstaller -F --noconsole --name "CCFWF-Extractor-Qt" --add-data "fonts;fonts" floppyExtract-Qt.py`. 
 
 ---
 
