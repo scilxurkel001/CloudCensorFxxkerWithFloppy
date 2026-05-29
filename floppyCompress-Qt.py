@@ -178,7 +178,7 @@ class CompressionWorker(QThread):
                         with fat.openbin(f"/{fat_filename}", 'wb') as dst_f:
                             dst_f.write(chunk)
                     except Exception as e:
-                        self.sig_error.emit(f"Failed to write to pyfatfs [{img_name}]: {e}")
+                        self.error.emit(f"Failed to write to pyfatfs [{img_name}]: {e}")
                         return
                     finally:
                         if fat:
@@ -214,7 +214,7 @@ class FloppyCompressorApp(QMainWindow):
 
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Compressor - v2.00b Based on Qt5")
+        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Compressor - v2.00c Based on Qt5")
         self.resize(900, 600)
         self.setMinimumSize(500, 400)
 
