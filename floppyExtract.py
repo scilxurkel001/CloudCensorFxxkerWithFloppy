@@ -1,88 +1,89 @@
 import logging
 import os
 import glob
-import struct
 import threading
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-from pyfatfs.PyFatFS import PyFatFS
-import zipfile
-import tempfile
 import hashlib
 import json
-import ctypes
-import sys
-import platform
+import tempfile
+import zipfile
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
+from pyfatfs.PyFatFS import PyFatFS
 
-# Optimized buffer for larger 2.88MB floppy images
+# Setting up CustomTkinter appearance and theme
+ctk.set_appearance_mode("System")  
+ctk.set_default_color_theme("blue")  
+
 def compute_sha256(file_path):
     h = hashlib.sha256()
     with open(file_path, 'rb') as f:
-        for b in iter(lambda: f.read(65536), b''):  # Upgrade to 64KB chunks for speed
+        for b in iter(lambda: f.read(65536), b''):
             h.update(b)
     return h.hexdigest()
 
-def setup_high_dpi():
-    if platform.system() == 'Windows':
-        try:
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except:
-            try:
-                ctypes.windll.user32.SetProcessDPIAware()
-            except:
-                pass
-
 class FloppyExtractorApp:
     def __init__(self, root):
-        def get_scale_factor():
-            if platform.system() == 'Windows':
-                try:
-                    return ctypes.windll.user32.GetDpiForSystem() / 96.0
-                except:
-                    hdc = ctypes.windll.user32.GetDC(0)
-                    dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)
-                    ctypes.windll.user32.ReleaseDC(0, hdc)
-                    return dpi / 96.0
-            # Linux and macOS typically handle DPI scaling automatically, but we can attempt to read GDK_SCALE for Linux
-            try:
-                # Some Linux environments use GDK_SCALE for scaling factor, default to 1.0 if not set
-                return float(os.environ.get('GDK_SCALE', 1.0))
-            except:
-                return 1.0
-        scale = get_scale_factor()
         self.root = root
-        self.root.title("CloudCensorFxxkerWithFloppy - Extractor - v1.20c")
-        BASE_W, BASE_H = 650, 450
-        self.root.geometry(f"{int(BASE_W * scale)}x{int(BASE_H * scale)}")
-        self.source_dir = tk.StringVar()
-        self.output_dir = tk.StringVar()
-        
+        self.root.title("CloudCensorFxxkerWithFloppy - Extractor - v1.30a - Based on CustomTkinter")
+        self.root.geometry("650x550")  
+        self.source_dir = ctk.StringVar()
+        self.output_dir = ctk.StringVar()
+        self.progress_max = 1 
         self.create_widgets()
 
     def create_widgets(self):
-        frame_src = ttk.LabelFrame(self.root, text=" 1. Select Directory Containing Floppy Images ", padding=10)
-        frame_src.pack(fill="x", padx=15, pady=10)
+        # 1. Input Directory Selection
+        frame_src = ctk.CTkFrame(self.root)
+        frame_src.pack(fill="x", padx=20, pady=(20, 10))
         
-        ttk.Entry(frame_src, textvariable=self.source_dir, width=50).pack(side="left", padx=5, expand=True, fill="x")
-        ttk.Button(frame_src, text="Browse...", command=self.browse_source).pack(side="right", padx=5)
+        lbl_src = ctk.CTkLabel(frame_src, text="1. Select Directory Containing Floppy Images", font=ctk.CTkFont(size=14, weight="bold"))
+        lbl_src.pack(anchor="w", padx=15, pady=(15, 5))
+        
+        subframe_src = ctk.CTkFrame(frame_src, fg_color="transparent")
+        subframe_src.pack(fill="x", padx=15, pady=(0, 15))
+        
+        self.entry_src = ctk.CTkEntry(subframe_src, textvariable=self.source_dir, placeholder_text="Select source folder...")
+        self.entry_src.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        
+        btn_src = ctk.CTkButton(subframe_src, text="Browse...", width=100, command=self.browse_source)
+        btn_src.pack(side="right")
 
-        frame_out = ttk.LabelFrame(self.root, text=" 2. Select Target Directory for Extraction and Merging ", padding=10)
-        frame_out.pack(fill="x", padx=15, pady=10)
+        # 2. Output Directory Selection
+        frame_out = ctk.CTkFrame(self.root)
+        frame_out.pack(fill="x", padx=20, pady=10)
         
-        ttk.Entry(frame_out, textvariable=self.output_dir, width=50).pack(side="left", padx=5, expand=True, fill="x")
-        ttk.Button(frame_out, text="Browse...", command=self.browse_output).pack(side="right", padx=5)
+        lbl_out = ctk.CTkLabel(frame_out, text="2. Select Target Directory for Extraction and Merging", font=ctk.CTkFont(size=14, weight="bold"))
+        lbl_out.pack(anchor="w", padx=15, pady=(15, 5))
+        
+        subframe_out = ctk.CTkFrame(frame_out, fg_color="transparent")
+        subframe_out.pack(fill="x", padx=15, pady=(0, 15))
+        
+        self.entry_out = ctk.CTkEntry(subframe_out, textvariable=self.output_dir, placeholder_text="Select output folder...")
+        self.entry_out.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        
+        btn_out = ctk.CTkButton(subframe_out, text="Browse...", width=100, command=self.browse_output)
+        btn_out.pack(side="right")
 
-        frame_progress = ttk.Frame(self.root, padding=10)
-        frame_progress.pack(fill="x", padx=15, pady=10)
+        # 3. Progress and Status
+        frame_progress = ctk.CTkFrame(self.root)
+        frame_progress.pack(fill="x", padx=20, pady=10)
         
-        self.lbl_status = ttk.Label(frame_progress, text="Ready", padding=10)
-        self.lbl_status.pack(anchor="w", pady=2)
+        self.lbl_status = ctk.CTkLabel(frame_progress, text="Status: Ready", anchor="w")
+        self.lbl_status.pack(fill="x", padx=15, pady=(15, 10))
         
-        self.progress = ttk.Progressbar(frame_progress, orient="horizontal", mode="determinate")
-        self.progress.pack(fill="x", pady=5)
+        self.progress = ctk.CTkProgressBar(frame_progress)
+        self.progress.pack(fill="x", padx=15, pady=(0, 15))
+        self.progress.set(0)
 
-        self.btn_start = ttk.Button(self.root, text="Start Automatic Extraction and Merging", command=self.start_extraction_thread)
-        self.btn_start.pack(pady=15)
+        # 4. Start Button
+        self.btn_start = ctk.CTkButton(
+            self.root, 
+            text="Start Automatic Extraction and Merging", 
+            height=40, 
+            font=ctk.CTkFont(size=14, weight="bold"),
+            command=self.start_extraction_thread
+        )
+        self.btn_start.pack(pady=20)
 
     def browse_source(self):
         directory = filedialog.askdirectory()
@@ -96,8 +97,7 @@ class FloppyExtractorApp:
         if not self.source_dir.get() or not self.output_dir.get():
             messagebox.showwarning("Warning", "Please select both source and target directories!")
             return
-        
-        self.btn_start.config(state="disabled")
+        self.btn_start.configure(state="disabled")
         threading.Thread(target=self.extract_process, daemon=True).start()
 
     def extract_process(self):
@@ -110,10 +110,10 @@ class FloppyExtractorApp:
         total_files = len(img_files)
         if total_files == 0:
             self.root.after(0, lambda: messagebox.showinfo("Info", "No files matching FLP*.IMG format found!"))
-            self.root.after(0, lambda: self.btn_start.config(state="normal"))
+            self.root.after(0, lambda: self.btn_start.configure(state="normal"))
             return
-
-        self.root.after(0, lambda: self.progress.config(maximum=total_files + 1, value=0))
+        self.progress_max = total_files + 1
+        self.root.after(0, lambda: self.progress.set(0))
         os.makedirs(out, exist_ok=True)
 
         temp_zip_fd, temp_zip_path = tempfile.mkstemp(suffix=".zip")
@@ -142,7 +142,7 @@ class FloppyExtractorApp:
             with open(temp_zip_path, 'wb') as zip_out:
                 for index, img_path in enumerate(img_files):
                     file_name = os.path.basename(img_path)
-                    self.root.after(0, lambda f=file_name, i=index: self.lbl_status.config(text=f"Reading & Verifying ({i+1}/{total_files}): {f}"))
+                    self.root.after(0, lambda f=file_name, i=index: self.lbl_status.configure(text=f"Reading & Verifying ({i+1}/{total_files}): {f}"))
                     
                     if manifest and file_name in manifest.get("images", {}):
                         img_hash = compute_sha256(img_path)
@@ -155,7 +155,6 @@ class FloppyExtractorApp:
                     chunk_data = b""
                     extracted_chunk = False
                     try:
-                        # PyFatFS safely opens 2.88MB as long as BPB is standard
                         fat = PyFatFS(img_path, read_only=True)
                         files_list = list(fat.walk.files("/"))
                         
@@ -194,8 +193,7 @@ class FloppyExtractorApp:
                         if fat is not None:
                             try: fat.close()
                             except Exception: pass
-                    
-                    self.root.after(0, lambda i=index+1: self.progress.config(value=i))
+                    self.root.after(0, lambda i=index+1: self.progress.set(i / self.progress_max))
 
             if manifest and os.path.exists(temp_zip_path):
                 final_zip_hash = compute_sha256(temp_zip_path)
@@ -216,37 +214,34 @@ class FloppyExtractorApp:
                         msg += "\nDo you want to Continue Anyway?"
                         result[0] = messagebox.askyesno("Verification Warning", msg, icon='warning')
                     finally:
-                        event.set() # Avoid thread deadlock even if window closes abruptly
+                        event.set()
                     
                 self.root.after(0, prompt)
                 event.wait()
                 
                 if not result[0]:
-                    self.root.after(0, lambda: self.lbl_status.config(text="❌ Aborted by user."))
+                    self.root.after(0, lambda: self.lbl_status.configure(text="❌ Aborted by user."))
                     raise Exception("Aborted by user due to verification failure.")
                     
-            self.root.after(0, lambda: self.lbl_status.config(text="Split parts merged successfully, extracting final ZIP archive..."))
+            self.root.after(0, lambda: self.lbl_status.configure(text="Split parts merged successfully, extracting final ZIP archive..."))
             
             with zipfile.ZipFile(temp_zip_path, 'r') as zf:
                 zf.extractall(out)
-                
-            # Thread-safe UI update
-            self.root.after(0, lambda: self.progress.config(value=total_files + 1))
-            self.root.after(0, lambda: self.lbl_status.config(text="✅ Extraction and merging successful!"))
+            self.root.after(0, lambda: self.progress.set(1.0))
+            self.root.after(0, lambda: self.lbl_status.configure(text="✅ Extraction and merging successful!"))
             self.root.after(0, lambda: messagebox.showinfo("Success", f"All floppy chunks have been successfully merged and extracted to:\n{out}"))
 
         except Exception as e:
             if "Aborted by user" not in str(e):
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Extraction failed:\n{str(e)}"))
-            self.root.after(0, lambda: self.lbl_status.config(text="❌ An error occurred"))
+            self.root.after(0, lambda: self.lbl_status.configure(text="❌ An error occurred"))
         finally:
             if os.path.exists(temp_zip_path):
                 try: os.remove(temp_zip_path)
                 except: pass
-            self.root.after(0, lambda: self.btn_start.config(state="normal"))
+            self.root.after(0, lambda: self.btn_start.configure(state="normal"))
 
 if __name__ == "__main__":
-    setup_high_dpi()
-    root = tk.Tk()
+    root = ctk.CTk()
     app = FloppyExtractorApp(root)
     root.mainloop()
