@@ -178,7 +178,7 @@ class ExtractionWorker(QThread):
             self.task_finished.emit(True, f"All floppy chunks have been successfully merged and extracted to:\n{self.out}")
 
         except Exception as e:
-            self.sig_error.emit(f"An error occurred during processing: {e}")
+            self.error.emit(f"An error occurred during processing: {e}")
             return
         finally:
             if os.path.exists(temp_zip_path):
@@ -194,7 +194,7 @@ class FloppyExtractorApp(QMainWindow):
 
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Extractor - v2.00b Based on Qt5")
+        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Extractor - v2.00c Based on Qt5")
         self.resize(900, 600)
         self.setMinimumSize(500, 400)
 
