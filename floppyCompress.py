@@ -1,19 +1,25 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import logging
 import os
 import struct
 import threading
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-from pyfatfs.PyFatFS import PyFatFS
-import zipfile
-import tempfile
 import hashlib
 import json
 import ctypes
 import sys
 import platform
+import tempfile
+import zipfile
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
 
-# 🔴 Optimized Geometry Configurations Matrix with Human-Readable Display Names
+from pyfatfs.PyFatFS import PyFatFS
+
+# ============================================================================
+# Configuration for different floppy formats
+# ============================================================================
 FLOPPY_CONFIGS = {
     "720KB (Standard Double Density Floppy) for <= 2GB data": {
         "key": "720KB",
@@ -77,6 +83,9 @@ FLOPPY_CONFIGS = {
     },
 }
 
+# ============================================================================
+# Tool functions
+# ============================================================================
 def compute_sha256(file_path):
     h = hashlib.sha256()
     with open(file_path, 'rb') as f:
@@ -136,115 +145,197 @@ def setup_high_dpi():
             except:
                 pass
 
+# ============================================================================
+# CustomTkinter Theme Setup
+# ============================================================================
+def setup_customtkinter_theme():
+    """Configure CustomTkinter appearance and theme settings"""
+    ctk.set_appearance_mode("System")
+    
+    ctk.set_default_color_theme("blue")
+
+# ============================================================================
+# Main Application Class
+# ============================================================================
 class FloppyCompressorApp:
-    def __init__(self, root):
-        def get_scale_factor():
-            if platform.system() == 'Windows':
-                try:
-                    return ctypes.windll.user32.GetDpiForSystem() / 96.0
-                except:
-                    hdc = ctypes.windll.user32.GetDC(0)
-                    dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)
-                    ctypes.windll.user32.ReleaseDC(0, hdc)
-                    return dpi / 96.0
-            # Linux and macOS typically handle DPI scaling automatically, but we can attempt to read GDK_SCALE for Linux
-            try:
-                # Some Linux environments use GDK_SCALE for scaling factor, default to 1.0 if not set
-                return float(os.environ.get('GDK_SCALE', 1.0))
-            except:
-                return 1.0
-        scale = get_scale_factor()
+    def __init__(self, root: ctk.CTk):
         self.root = root
-        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.21c")
-        BASE_W, BASE_H = 650, 450
-        self.root.geometry(f"{int(BASE_W * scale)}x{int(BASE_H * scale)}")
-        self.source_path = tk.StringVar()
-        self.output_dir = tk.StringVar()
+        self.root.title("CloudCensorFxxkerWithFloppy - Compressor - v1.30a - Based on CustomTkinter")
+        self.root.geometry("650x450")
+        # Binding variables
+        self.source_path = ctk.StringVar()
+        self.output_dir = ctk.StringVar()
+        self.capacity_display_var = ctk.StringVar(
+            value="1440KB (Standard High Density Floppy) for 2-4GB data"
+        )
         
-        # Default combo selection text
-        self.capacity_display_var = tk.StringVar(value="1440KB (Standard High Density Floppy) for 2-4GB data")
-        self.create_widgets()
+        # Create UI components
+        self._create_widgets()
 
-    def create_widgets(self):
-        # 1. Select Source
-        frame_src = ttk.LabelFrame(self.root, text=" 1. Select Source ", padding=10)
+    def _create_widgets(self):
+        """Create and layout all UI components using CustomTkinter"""
+        
+        def create_labeled_frame(parent, title, **frame_kwargs):
+            """Function to create a labeled section frame with a title and content area"""
+            container = ctk.CTkFrame(parent, **frame_kwargs)
+            title_label = ctk.CTkLabel(
+                container, 
+                text=f" {title} ",
+                font=ctk.CTkFont(weight="bold", size=12)
+            )
+            title_label.pack(anchor="w", padx=10, pady=(5, 0))
+            content_frame = ctk.CTkFrame(container, fg_color="transparent")
+            content_frame.pack(fill="both", expand=True, padx=10, pady=5)
+            return container, content_frame
+
+        # 1. Select Source Section
+        frame_src, content_src = create_labeled_frame(
+            self.root, "1. Select Source", corner_radius=10
+        )
         frame_src.pack(fill="x", padx=15, pady=8)
-        ttk.Entry(frame_src, textvariable=self.source_path, width=42).pack(side="left", padx=5, expand=True, fill="x")
-        ttk.Button(frame_src, text="File", command=self.browse_file, width=6).pack(side="right", padx=2)
-        ttk.Button(frame_src, text="Folder", command=self.browse_folder, width=6).pack(side="right", padx=2)
+        entry_frame = ctk.CTkFrame(content_src, fg_color="transparent")
+        entry_frame.pack(fill="x", expand=True)
+        
+        ctk.CTkEntry(
+            entry_frame, 
+            textvariable=self.source_path, 
+            width=300,
+            placeholder_text="Select file or folder..."
+        ).pack(side="left", padx=(0, 5), expand=True, fill="x")
+        
+        btn_frame = ctk.CTkFrame(entry_frame, fg_color="transparent")
+        btn_frame.pack(side="right")
+        
+        ctk.CTkButton(
+            btn_frame, text="📁 File", command=self.browse_file, width=60
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            btn_frame, text="📂 Folder", command=self.browse_folder, width=60
+        ).pack(side="left", padx=2)
 
-        # 2. Select Floppy Format Size (UI Optimized)
-        frame_cfg = ttk.LabelFrame(self.root, text=" 2. Floppy Target Specification ", padding=10)
+        # 2. Floppy Format Configuration
+        frame_cfg, content_cfg = create_labeled_frame(
+            self.root, "2. Floppy Target Specification", corner_radius=10
+        )
         frame_cfg.pack(fill="x", padx=15, pady=8)
-
-        row1 = ttk.Frame(frame_cfg)
+        
+        # Row 1: Combobox
+        row1 = ctk.CTkFrame(content_cfg, fg_color="transparent")
         row1.pack(fill="x", pady=(0, 4))
-        ttk.Label(row1, text="Select Format Type: ").pack(side="left", padx=5)
-        self.combo_capacity = ttk.Combobox(
+        
+        ctk.CTkLabel(row1, text="Select Format Type:").pack(side="left", padx=5)
+        
+        self.combo_capacity = ctk.CTkComboBox(
             row1,
-            textvariable=self.capacity_display_var,
+            variable=self.capacity_display_var,
             values=list(FLOPPY_CONFIGS.keys()),
             state="readonly",
-            width=48
+            width=400,
+            command=lambda _: self.update_chunk_hint()
         )
         self.combo_capacity.pack(side="left", padx=5)
+        self.combo_capacity.set(self.capacity_display_var.get())
 
-        row2 = ttk.Frame(frame_cfg)
+        # Row 2: Chunk hint label
+        row2 = ctk.CTkFrame(content_cfg, fg_color="transparent")
         row2.pack(fill="x")
-
-        self.lbl_chunk_hint = ttk.Label(
+        
+        self.lbl_chunk_hint = ctk.CTkLabel(
             row2,
             text="Split Chunk Size: 1320 KB",
-            foreground="#0066cc",
-            padding=9
+            text_color="#3498db",
+            font=ctk.CTkFont(size=11)
         )
         self.lbl_chunk_hint.pack(side="left", padx=(120, 0))
+        
+        # Initial update of chunk hint based on default selection
+        self.update_chunk_hint()
 
-        self.combo_capacity.bind("<<ComboboxSelected>>", self.update_chunk_hint)
-
-        # 3. Select Output
-        frame_out = ttk.LabelFrame(self.root, text=" 3. Select Output Directory ", padding=10)
+        # 3. Output Directory
+        frame_out, content_out = create_labeled_frame(
+            self.root, "3. Select Output Directory", corner_radius=10
+        )
         frame_out.pack(fill="x", padx=15, pady=8)
-        ttk.Entry(frame_out, textvariable=self.output_dir, width=50).pack(side="left", padx=5, expand=True, fill="x")
-        ttk.Button(frame_out, text="Browse...", command=self.browse_output).pack(side="right", padx=5)
+        
+        out_frame = ctk.CTkFrame(content_out, fg_color="transparent")
+        out_frame.pack(fill="x", expand=True)
+        
+        ctk.CTkEntry(
+            out_frame, 
+            textvariable=self.output_dir, 
+            width=350,
+            placeholder_text="Output folder..."
+        ).pack(side="left", padx=(0, 5), expand=True, fill="x")
+        
+        ctk.CTkButton(
+            out_frame, text="Browse...", command=self.browse_output, width=80
+        ).pack(side="right", padx=5)
 
-        # Progress Area
-        frame_progress = ttk.Frame(self.root, padding=10)
+        # Progress & Status Area
+        frame_progress = ctk.CTkFrame(self.root, corner_radius=10)
         frame_progress.pack(fill="x", padx=15, pady=5)
-        self.lbl_status = ttk.Label(frame_progress, text="Ready", padding=5)
-        self.lbl_status.pack(anchor="w", pady=2)
-        self.progress = ttk.Progressbar(frame_progress, orient="horizontal", mode="indeterminate")
-        self.progress.pack(fill="x", pady=5)
+        
+        self.lbl_status = ctk.CTkLabel(
+            frame_progress, 
+            text="Ready", 
+            anchor="w",
+            font=ctk.CTkFont(size=11)
+        )
+        self.lbl_status.pack(anchor="w", pady=2, padx=5)
+        
+        self.progress = ctk.CTkProgressBar(
+            frame_progress, 
+            orientation="horizontal", 
+            mode="indeterminate",
+            progress_color="#2ecc71"
+        )
+        self.progress.pack(fill="x", pady=5, padx=5)
+        self.progress.set(0)
 
-        self.btn_start = ttk.Button(self.root, text="Start Matrix Compression and Generate Floppy Images", command=self.start_compression_thread)
-        self.btn_start.pack(pady=10)
+        # Start Button
+        self.btn_start = ctk.CTkButton(
+            self.root, 
+            text="🚀 Start Matrix Compression and Generate Floppy Images", 
+            command=self.start_compression_thread,
+            height=40,
+            font=ctk.CTkFont(weight="bold", size=12),
+            corner_radius=8
+        )
+        self.btn_start.pack(pady=15)
 
     def update_chunk_hint(self, event=None):
+        """Update the chunk size hint label based on the selected floppy format"""
         selected_display = self.capacity_display_var.get()
-        chunk_kb = FLOPPY_CONFIGS[selected_display]["chunk_size"] // 1024
-        self.lbl_chunk_hint.config(text=f"Split Chunk Size: {chunk_kb} KB")
+        if selected_display in FLOPPY_CONFIGS:
+            chunk_kb = FLOPPY_CONFIGS[selected_display]["chunk_size"] // 1024
+            self.lbl_chunk_hint.configure(text=f"Split Chunk Size: {chunk_kb} KB")
 
+    # Messagebox and File Dialog Methods
     def browse_file(self):
         path = filedialog.askopenfilename()
-        if path: self.source_path.set(os.path.normpath(path))
+        if path: 
+            self.source_path.set(os.path.normpath(path))
 
     def browse_folder(self):
         path = filedialog.askdirectory()
-        if path: self.source_path.set(os.path.normpath(path))
+        if path: 
+            self.source_path.set(os.path.normpath(path))
 
     def browse_output(self):
         path = filedialog.askdirectory()
-        if path: self.output_dir.set(os.path.normpath(path))
+        if path: 
+            self.output_dir.set(os.path.normpath(path))
 
+    # Compression Process in a Separate Thread
     def start_compression_thread(self):
         if not self.source_path.get() or not self.output_dir.get():
             messagebox.showwarning("Warning", "Please select both source and output directories!")
             return
 
-        self.btn_start.config(state="disabled")
-        self.combo_capacity.config(state="disabled")
-        self.progress.config(mode="indeterminate")
-        self.progress.start(10)
+        self.btn_start.configure(state="disabled")
+        self.combo_capacity.configure(state="disabled")
+        self.progress.configure(mode="indeterminate")
+        self.progress.start()
 
         threading.Thread(target=self.compress_process, daemon=True).start()
 
@@ -252,7 +343,6 @@ class FloppyCompressorApp:
         src = self.source_path.get()
         out = self.output_dir.get()
         
-        # Map the verbose display text back to hardware configuration
         selected_display = self.capacity_display_var.get()
         cfg = FLOPPY_CONFIGS[selected_display]
         chunk_size = cfg["chunk_size"]
@@ -261,7 +351,8 @@ class FloppyCompressorApp:
         temp_zip = os.path.join(tempfile.gettempdir(), f"floppy_temp_{os.getpid()}.zip")
 
         try:
-            self.root.after(0, lambda: self.lbl_status.config(text="Step 1/2: Compressing source files into temporary archive..."))
+            self.root.after(0, lambda: self.lbl_status.configure(
+                text="Step 1/2: Compressing source files into temporary archive..."))
 
             with zipfile.ZipFile(temp_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
                 if os.path.isfile(src):
@@ -277,7 +368,7 @@ class FloppyCompressorApp:
             zip_hash = compute_sha256(temp_zip)
             manifest = {
                 "zip_hash": zip_hash,
-                "floppy_format": raw_format_key, # Keep clean key strings inside json for backend parsing
+                "floppy_format": raw_format_key,
                 "images": {}
             }
 
@@ -286,8 +377,9 @@ class FloppyCompressorApp:
 
             def switch_to_determinate_mode(total, fmt):
                 self.progress.stop()
-                self.progress.config(mode="determinate", maximum=total, value=0)
-                self.lbl_status.config(text=f"Step 2/2: Splitting and Writing {fmt} Images (Total: {total})...")
+                self.progress.configure(mode="determinate")
+                self.progress.set(0)
+                self.lbl_status.configure(text=f"Step 2/2: Splitting and Writing {fmt} Images (Total: {total})...")
 
             self.root.after(0, switch_to_determinate_mode, total_disks, raw_format_key)
 
@@ -300,11 +392,10 @@ class FloppyCompressorApp:
                     disk_num += 1
                     
                     chunk_hash = hashlib.sha256(chunk).hexdigest()
-
                     img_name = f"FLP{disk_num:05d}.IMG"
                     img_path = os.path.join(out, img_name)
 
-                    self.root.after(0, lambda d=disk_num, t=total_disks: self.lbl_status.config(
+                    self.root.after(0, lambda d=disk_num, t=total_disks: self.lbl_status.configure(
                         text=f"Writing {raw_format_key} Image ({d}/{t})..."))
 
                     create_dynamic_fat12_image(img_path, cfg)
@@ -324,7 +415,8 @@ class FloppyCompressorApp:
                         "image_hash": image_hash
                     }
 
-                    self.root.after(0, lambda v=disk_num: self.progress.config(value=v))
+                    self.root.after(0, lambda v=disk_num, t=total_disks: 
+                        self.progress.set(v / t) if self.progress.cget("mode") == "determinate" else None)
 
             # Export manifest.json
             manifest_path = os.path.join(out, "manifest.json")
@@ -340,17 +432,23 @@ class FloppyCompressorApp:
             ))
         except Exception as e:
             self.root.after(0, lambda: messagebox.showerror("Error", f"Processing failed:\n{str(e)}"))
-            self.root.after(0, lambda: self.lbl_status.config(text="❌ An error occurred"))
+            self.root.after(0, lambda: self.lbl_status.configure(text="❌ An error occurred"))
         finally:
             if os.path.exists(temp_zip):
-                try: os.remove(temp_zip)
-                except: pass
+                try: 
+                    os.remove(temp_zip)
+                except: 
+                    pass
             self.root.after(0, lambda: self.progress.stop())
-            self.root.after(0, lambda: self.btn_start.config(state="normal"))
-            self.root.after(0, lambda: self.combo_capacity.config(state="readonly"))
+            self.root.after(0, lambda: self.btn_start.configure(state="normal"))
+            self.root.after(0, lambda: self.combo_capacity.configure(state="normal"))
 
+
+# ============================================================================
+# Main Entry Point
+# ============================================================================
 if __name__ == "__main__":
-    setup_high_dpi()
-    root = tk.Tk()
+    setup_customtkinter_theme()
+    root = ctk.CTk()
     app = FloppyCompressorApp(root)
     root.mainloop()
