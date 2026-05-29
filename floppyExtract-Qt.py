@@ -178,7 +178,8 @@ class ExtractionWorker(QThread):
             self.task_finished.emit(True, f"All floppy chunks have been successfully merged and extracted to:\n{self.out}")
 
         except Exception as e:
-            self.error.emit(str(e))
+            self.sig_error.emit(f"An error occurred during processing: {e}")
+            return
         finally:
             if os.path.exists(temp_zip_path):
                 try: os.remove(temp_zip_path)
@@ -338,7 +339,7 @@ class FloppyExtractorApp(QMainWindow):
             if hasattr(self.worker, 'prompt_event') and not self.worker.prompt_event.is_set():
                 self.worker.user_response = False
                 self.worker.prompt_event.set()
-            self.worker.wait(2000)
+            self.worker.wait(5000)
         event.accept()
 
 # ============ Program Entry Point ============
