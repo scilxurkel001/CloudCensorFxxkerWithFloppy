@@ -194,7 +194,7 @@ class FloppyExtractorApp(QMainWindow):
 
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Extractor - v2.00a Based on Qt5")
+        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Extractor - v2.00b Based on Qt5")
         self.resize(900, 600)
         self.setMinimumSize(500, 400)
 
