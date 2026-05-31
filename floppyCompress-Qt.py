@@ -214,7 +214,7 @@ class FloppyCompressorApp(QMainWindow):
 
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Compressor - v2.00c Based on Qt5")
+        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Compressor - v2.00d Based on Qt5")
         self.resize(900, 600)
         self.setMinimumSize(500, 400)
 
