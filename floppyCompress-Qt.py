@@ -408,7 +408,7 @@ if __name__ == "__main__":
     app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
     # =====================================================
     
-    font_path = os.path.join(os.path.dirname(__file__), "fonts", "DreamHanSansCN-Medium-W18.ttf")
+    font_path = os.path.join(os.path.dirname(__file__), "fonts", "MiSans-Medium.ttf")
     font_id = QFontDatabase.addApplicationFont(font_path)
     if font_id != -1:
         font_families = QFontDatabase.applicationFontFamilies(font_id)
