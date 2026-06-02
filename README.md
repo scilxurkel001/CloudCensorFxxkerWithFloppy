@@ -14,6 +14,7 @@ Remember you can then archive your multiple IMG floppy files to one ZIP / 7Z fil
 
 1. Go to [GitHub Release](https://github.com/scilxurkel001/CloudCensorFxxkerWithFloppy/releases) and download the latest release.
 2. Unzip the ZIP file, you will see "CCFWF-Compressor" and "CCFWF-Extractor".
+3. Both tools have a GUI and their standalone dependencies, so no Python or command line needed. And the tools don't support the command line way.
 
 To compress:
 1. Run "CCFWF-Compressor".
