@@ -10,6 +10,23 @@ Remember you can then archive your multiple IMG floppy files to one ZIP / 7Z fil
 
 ---
 
+## Quick Start
+
+1. Go to [GitHub Release](https://github.com/scilxurkel001/CloudCensorFxxkerWithFloppy/releases) and download the latest release.
+2. Unzip the ZIP file, you will see "CCFWF-Compressor" and "CCFWF-Extractor".
+
+To compress:
+1. Run "CCFWF-Compressor".
+2. Select source, floppy format type and output dictionary.
+3. Click "Start Matrix Compression and Generate Floppy Images"
+4. Wait for it (be patient) and you will see a folder full of IMG files.
+
+To extract:
+1. Run "CCFWF-Extractor".
+2. Select directory containing floppy images and target directory for extraction and merging.
+3. Click "Start Automatic Extraction and Merging"
+4. Wait for it (be patient) and you will see your original file or folder.
+
 ## 🛠️ Building and Installation
 
 You need:
