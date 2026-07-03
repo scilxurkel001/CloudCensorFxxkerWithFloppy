@@ -74,6 +74,7 @@ If you use the Qt version, you need to execute `uv run pyinstaller -F --noconsol
 - A maximum of 99,999 files can be generated; exceeding this limit may result in program errors or unpredictable behavior. Based on the provided options, the 1440KB setting supports a maximum file size of approximately 137.3 GB.
 - Althrough a maximum of 99,999 files can be generated, but your file explorer will be crashed when loading too many small files (maybe 10,000?), so following the tip in the Dropdown Menu is recommended.
 - For avoiding the Account Risk Control for uploading large numbers of small files in NetDisk, always remember you can create an archive for these small IMG files. The ISO image is recommended because it can be mounted without decompression, This saves temporary storage space and extends the lifespan of the hard drive. Use WinCDEmu (Recommended - It is Free and Open Source) or UltraISO (For advanced users, a paid key is required) to create ISO files.
+- To clear your activation status: Delete "C:\Users\<username>\AppData\Roaming\CloudCensorFxxker" folder.
 
 ## License
 AGPL License - Feel free to fork and mess around but you need to open source everything, for avoiding the NetDisk provider use it.
