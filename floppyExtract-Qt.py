@@ -6,6 +6,7 @@ import threading
 import hashlib
 import json
 import tempfile
+import webbrowser
 import zipfile
 import sys
 import platform
@@ -13,7 +14,8 @@ import platform
 from PySide2.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QLineEdit, 
     QPushButton, QProgressBar, QGroupBox, 
-    QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QFrame
+    QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QFrame,
+    QDialog
 )
 from PySide2.QtCore import Qt, Signal, Slot, QThread
 from PySide2.QtGui import QFontDatabase, QFont, QPalette, QColor
@@ -26,6 +28,260 @@ def compute_sha256(file_path):
         for b in iter(lambda: f.read(65536), b''):
             h.update(b)
     return h.hexdigest()
+
+# ==================== ACTIVATION SYSTEM ====================
+import uuid
+
+KEY_CHARSET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+# Secret Magic bytes to identify the activation file format
+_ACTIVATION_MAGIC = b'CCFX\x01'
+# Static salt for key derivation, should be kept secret and consistent
+_ACTIVATION_SALT = "Scilxurkel-LOVE-Gensokyo!"
+
+def get_machine_code() -> str:
+    mac = str(uuid.getnode())
+    info = f"{mac}|{platform.system()}|{platform.node()}"
+    return hashlib.md5(info.encode('utf-8')).hexdigest().upper()[:16]
+
+def get_activation_file_path() -> str:
+    if sys.platform == "win32":
+        base_dir = os.environ.get("APPDATA", os.path.expanduser("~"))
+    else:
+        base_dir = os.environ.get("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config"))
+    config_dir = os.path.join(base_dir, "CloudCensorFxxker")
+    os.makedirs(config_dir, exist_ok=True)
+    return os.path.join(config_dir, "activation.dat")
+
+def _derive_key_stream(password: str, length: int) -> bytes:
+    stream = b''
+    counter = 0
+    while len(stream) < length:
+        block = hashlib.sha256(f"{_ACTIVATION_SALT}|{password}|{counter}".encode('utf-8')).digest()
+        stream += block
+        counter += 1
+    return stream[:length]
+
+def _crypt_bytes(data: bytes, password: str) -> bytes:
+    key_stream = _derive_key_stream(password, len(data))
+    return bytes(d ^ k for d, k in zip(data, key_stream))
+
+def _save_activation_data(data: dict) -> None:
+    plaintext = json.dumps(data, ensure_ascii=False).encode('utf-8')
+    password = f"{get_machine_code()}|{_ACTIVATION_SALT}"
+    ciphertext = _crypt_bytes(plaintext, password)
+    path = get_activation_file_path()
+    with open(path, 'wb') as f:
+        f.write(_ACTIVATION_MAGIC)
+        f.write(ciphertext)
+
+def _load_activation_data() -> dict:
+    path = get_activation_file_path()
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, 'rb') as f:
+            raw = f.read()
+        if not raw.startswith(_ACTIVATION_MAGIC):
+            return None
+        ciphertext = raw[len(_ACTIVATION_MAGIC):]
+        password = f"{get_machine_code()}|{_ACTIVATION_SALT}"
+        plaintext = _crypt_bytes(ciphertext, password)
+        return json.loads(plaintext.decode('utf-8'))
+    except Exception:
+        return None
+
+def validate_activation_key(key: str, machine_code: str) -> bool:
+    clean = key.replace('-', '').upper().strip()
+    if len(clean) != 25:
+        return False
+    try:
+        values = [KEY_CHARSET.index(c) for c in clean]
+    except ValueError:
+        return False
+
+    # Layer 1
+    for i in range(0, 25, 5):
+        g = values[i:i+5]
+        checksum = (g[0] * 2 + g[1] * 3 + g[2] * 5 + g[3] * 7) % 24
+        if checksum != g[4]:
+            return False
+
+    # Layer 2
+    checksums = [values[i] for i in [4, 9, 14, 19, 24]]
+    cross_total = sum(c * (i + 1) for i, c in enumerate(checksums))
+    if cross_total % 24 not in (2, 6, 8, 13):
+        return False
+
+    # Layer 3
+    if sum(values) % 24 not in (6, 9, 10, 11, 13, 15):
+        return False
+
+    # Layer 4
+    fingerprint = ''.join(KEY_CHARSET[values[i]] for i in [0, 5, 10, 15, 20])
+    expected_fp = hashlib.md5(
+        f"{machine_code}|{_ACTIVATION_SALT}|finger".encode('utf-8')
+    ).hexdigest().upper()[:5]
+    expected_fp = ''.join(c if c in KEY_CHARSET else KEY_CHARSET[ord(c) % len(KEY_CHARSET)] for c in expected_fp)
+    if fingerprint != expected_fp:
+        return False
+
+    return True
+
+def is_activated() -> bool:
+    data = _load_activation_data()
+    if not data:
+        return False
+    if data.get("machine") != get_machine_code():
+        return False
+    return data.get("activated", False) and validate_activation_key(
+        data.get("key", ""), data.get("machine", "")
+    )
+
+def activate_app(key: str) -> bool:
+    machine = get_machine_code()
+    if validate_activation_key(key, machine):
+        _save_activation_data({
+            "activated": True,
+            "key": key.upper(),
+            "machine": machine,
+            "time": int(__import__('time').time())
+        })
+        return True
+    return False
+
+# ==================== ACTIVATION DIALOG ====================
+class ActivationDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("🔐 Product Activation")
+        self.setFixedSize(520, 600)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        title = QLabel("CloudCensorFxxker Activation")
+        title.setStyleSheet("font-size: 16px; font-weight: bold; color: #4fc3f7;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        # Machine Code Display
+        machine_frame = QFrame()
+        machine_frame.setStyleSheet("""
+            QFrame { background-color: #1e272e; border: 1px solid #455a64; border-radius: 5px; }
+        """)
+        mf_layout = QVBoxLayout(machine_frame)
+        mf_layout.setContentsMargins(10, 8, 10, 8)
+        mf_layout.setSpacing(4)
+
+        mc_label = QLabel("Your Machine Code (send this to get your key):")
+        mc_label.setStyleSheet("color: #b0bec5; font-size: 11px;")
+        mf_layout.addWidget(mc_label)
+
+        mc_row = QHBoxLayout()
+        self.txt_machine = QLineEdit(get_machine_code())
+        self.txt_machine.setReadOnly(True)
+        self.txt_machine.setStyleSheet("""
+            QLineEdit {
+                padding: 6px; font-family: Consolas, monospace; font-size: 13px;
+                background-color: #263238; color: #ffca28; border: 1px solid #455a64;
+            }
+        """)
+        btn_copy = QPushButton("Copy")
+        btn_copy.setFixedWidth(60)
+        btn_copy.setStyleSheet("""
+            QPushButton { background-color: #455a64; color: white; padding: 4px; }
+            QPushButton:hover { background-color: #546e7a; }
+        """)
+        btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(self.txt_machine.text()))
+        mc_row.addWidget(self.txt_machine)
+        mc_row.addWidget(btn_copy)
+        mf_layout.addLayout(mc_row)
+        layout.addWidget(machine_frame)
+
+        info = QLabel("Enter your 25-character activation key:")
+        info.setStyleSheet("color: #b0bec5;")
+        layout.addWidget(info)
+
+        self.txt_key = QLineEdit()
+        self.txt_key.setPlaceholderText("XXXXX-XXXXX-XXXXX-XXXXX-XXXXX")
+        self.txt_key.setMaxLength(29)
+        self.txt_key.setStyleSheet("""
+            QLineEdit {
+                padding: 10px; font-size: 14px; font-family: Consolas, monospace;
+                border: 2px solid #455a64; border-radius: 5px;
+                background-color: #263238; color: #ffffff;
+            }
+            QLineEdit:focus { border-color: #4fc3f7; }
+        """)
+        self.txt_key.textChanged.connect(self.auto_format_key)
+        layout.addWidget(self.txt_key)
+
+        self.lbl_status = QLabel("")
+        self.lbl_status.setStyleSheet("color: #ef5350; min-height: 20px;")
+        self.lbl_status.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.lbl_status)
+
+        btn_layout = QHBoxLayout()
+        self.btn_activate = QPushButton("Activate")
+        self.btn_activate.setFixedHeight(38)
+        self.btn_activate.setStyleSheet("""
+            QPushButton { background-color: #1976d2; color: white; font-weight: bold;
+                border-radius: 5px; padding: 8px 20px; }
+            QPushButton:hover { background-color: #1565c0; }
+            QPushButton:pressed { background-color: #0d47a1; }
+        """)
+        self.btn_activate.clicked.connect(self.on_activate)
+
+        self.btn_exit = QPushButton("Exit")
+        self.btn_exit.setFixedHeight(38)
+        self.btn_exit.setStyleSheet("""
+            QPushButton { background-color: #455a64; color: white; border-radius: 5px; padding: 8px 20px; }
+            QPushButton:hover { background-color: #37474f; }
+        """)
+        self.btn_exit.clicked.connect(self.reject)
+
+        btn_layout.addWidget(self.btn_activate)
+        btn_layout.addWidget(self.btn_exit)
+        layout.addLayout(btn_layout)
+
+        key_info = QLabel("Click here to get a keygen.")
+        key_info.setStyleSheet("color: #b0bec5; text-decoration: underline;")
+        key_info.mousePressEvent = lambda e: webbrowser.open("https://github.com/scilxurkel001/sxk-soft-keygen")
+        layout.addWidget(key_info)
+
+    def auto_format_key(self, text):
+        clean = text.replace('-', '').upper()
+        clean = ''.join(c for c in clean if c in KEY_CHARSET)
+        parts = [clean[i:i+5] for i in range(0, len(clean), 5)]
+        formatted = '-'.join(parts)
+        cursor_pos = self.txt_key.cursorPosition()
+        self.txt_key.blockSignals(True)
+        self.txt_key.setText(formatted)
+        new_pos = cursor_pos
+        dash_count = formatted[:cursor_pos].count('-')
+        old_dash_count = text[:cursor_pos].count('-')
+        if dash_count > old_dash_count:
+            new_pos += (dash_count - old_dash_count)
+        self.txt_key.setCursorPosition(min(new_pos, len(formatted)))
+        self.txt_key.blockSignals(False)
+
+    def on_activate(self):
+        key = self.txt_key.text().strip()
+        if not key:
+            self.lbl_status.setText("⚠️ Please enter an activation key")
+            return
+        if activate_app(key):
+            self.lbl_status.setStyleSheet("color: #66bb6a;")
+            self.lbl_status.setText("✅ Activation successful!")
+            from PySide2.QtCore import QTimer
+            QTimer.singleShot(500, self.accept)
+        else:
+            self.lbl_status.setStyleSheet("color: #ef5350;")
+            self.lbl_status.setText("❌ Invalid key or not matched to this machine.")
+
+# ==================== MAIN WINDOW ====================
 
 # ============ Working Thread ============
 class ExtractionWorker(QThread):
@@ -194,7 +450,7 @@ class FloppyExtractorApp(QMainWindow):
 
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Extractor - v2.00d Based on Qt5")
+        self.setWindowTitle("CloudCensorFxxkerWithFloppy - Extractor - v2.10a Based on Qt5")
         self.resize(900, 600)
         self.setMinimumSize(500, 400)
 
@@ -369,7 +625,20 @@ if __name__ == "__main__":
     dark_palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(127, 127, 127))
 
     app.setPalette(dark_palette)
-    
+    # === ACTIVATION CHECK ===
+    if not is_activated():
+        dialog = ActivationDialog()
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #353535;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+        """)
+        if dialog.exec_() != QDialog.Accepted:
+            sys.exit(0)
+    # ========================
     # Fix ToolTip style for better visibility in dark mode
     app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
     # =====================================================
