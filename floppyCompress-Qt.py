@@ -239,7 +239,7 @@ class ActivationDialog(QDialog):
         btn_layout.addWidget(self.btn_exit)
         layout.addLayout(btn_layout)
 
-        key_info = QLabel("Click here to get a keygen.")
+        key_info = QLabel("No key? Click here to get one.")
         key_info.setStyleSheet("color: #b0bec5; text-decoration: underline;")
         key_info.mousePressEvent = lambda e: webbrowser.open("https://github.com/scilxurkel001/sxk-soft-keygen")
         layout.addWidget(key_info)
