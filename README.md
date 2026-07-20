@@ -1,5 +1,7 @@
 # CloudCensorFxxkerWithFloppy
 
+English / [简体中文 Simplified Chinese](README_ZHCN.md)
+
 ---
 
 ## Features
