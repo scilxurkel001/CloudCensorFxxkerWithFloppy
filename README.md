@@ -79,7 +79,7 @@ If you use the Qt version, you need to execute `uv run pyinstaller -F --noconsol
 - To clear your activation status: Delete "C:\Users\<username>\AppData\Roaming\CloudCensorFxxker" folder.
 
 ## License
-AGPL License - Feel free to fork and mess around but you need to open source everything, for avoiding the NetDisk provider use it.
+AGPL License - Feel free to fork and mess around but you need to open source everything. For avoiding the NetDisk provider use it.
 
 ## Inspired by
 The incident of "Quark Cloud Drive cleans the resource of the movie"
